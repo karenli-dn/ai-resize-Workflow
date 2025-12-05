@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 輔助多尺寸 Resize 流程標準規範</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 React 與 Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        body { background-color: #f8fafc; }
+        /* 簡單的淡入動畫 */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.2s ease-out forwards;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // SVG Icons Components (Inline for portability)
+        const Layers = ({className}) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        );
+        const LayoutTemplate = ({className}) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="7" x="3" y="3" rx="1"/><rect width="9" height="7" x="3" y="14" rx="1"/><rect width="5" height="7" x="16" y="14" rx="1"/></svg>
+        );
+        const Wand2 = ({className}) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>
+        );
+        const ArrowDown = ({className}) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+        );
+        const PenTool = ({className}) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+        );
+        const CheckCircle2 = ({className}) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+        );
+        const AlertCircle = ({className}) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+        );
+        const ImageIcon = ({className}) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+        );
+        const ZoomIn = ({className}) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/><line x1="11" x2="11" y1="8" y2="14"/><line x1="8" x2="14" y1="11" y2="11"/></svg>
+        );
+        const XIcon = ({className}) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        );
+
+        const Flowchart = () => {
+            // Lightbox State
+            const [lightboxOpen, setLightboxOpen] = React.useState(false);
+            const [lightboxImage, setLightboxImage] = React.useState({ src: '', title: '' });
+
+            const openLightbox = (src, title) => {
+                setLightboxImage({ src, title });
+                setLightboxOpen(true);
+            };
+
+            const steps = [
+                {
+                    id: 1,
+                    title: "分離原始 KV 圖層",
+                    subtitle: "避免結構崩壞",
+                    icon: <Layers className="w-6 h-6 text-indigo-600" />,
+                    type: "prep",
+                    content: [
+                        "將人物、IP 與文字視為同級主體，與背景完全分離",
+                        "確保主視覺元素獨立，建立多尺寸排版素材庫"
+                    ]
+                },
+                {
+                    id: 2,
+                    title: "建立多尺寸工作區域",
+                    subtitle: "PS / AI 工作區設定",
+                    icon: <LayoutTemplate className="w-6 h-6 text-indigo-600" />,
+                    type: "prep",
+                    content: [
+                        "建立所有需求尺寸 (600×700 / 1400×550 / 390×270...)",
+                        "作為後續放置背景與排版的固定版面"
+                    ]
+                },
+                {
+                    id: 3,
+                    title: "AI 延伸背景與修整",
+                    subtitle: "Nano Banana Pro + 去浮水印",
+                    icon: <Wand2 className="w-6 h-6 text-white" />,
+                    type: "ai",
+                    highlight: true,
+                    content: [
+                        "依尺寸輸入指令生成背景延伸圖",
+                        "放回 PS / AI 對應尺寸中",
+                        "立即修除延伸背景上的浮水印與 AI 紋理瑕疵"
+                    ]
+                },
+                {
+                    id: 4,
+                    title: "置入延伸背景",
+                    subtitle: "底層定位",
+                    icon: <ArrowDown className="w-6 h-6 text-indigo-600" />,
+                    type: "assembly",
+                    content: [
+                        "放在最底層並套用比例",
+                        "與版面定位線對齊",
+                        "預備上方進行排版"
+                    ]
+                },
+                {
+                    id: 5,
+                    title: "排版主體 / 文字 / Logo",
+                    subtitle: "人工構圖調整 (核心)",
+                    icon: <PenTool className="w-6 h-6 text-white" />,
+                    type: "human",
+                    highlight: true,
+                    content: [
+                        "注重各尺寸的構圖差異，微調元素位置",
+                        "嚴格遵守品牌安全邊界與視覺規範",
+                        "決定整體品質的核心步驟"
+                    ]
+                },
+                {
+                    id: 6,
+                    title: "最終檢查與輸出",
+                    subtitle: "QC 與 交付",
+                    icon: <CheckCircle2 className="w-6 h-6 text-emerald-600" />,
+                    type: "output",
+                    content: [
+                        "尺寸正確且檔案大小未超標",
+                        "壓縮設定符合 FB / IG / GDN / 官網規範",
+                        "一鍵輸出全部 Artboard / Assets"
+                    ]
+                }
+            ];
+
+            return (
+                <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-800">
+                    <div className="max-w-3xl mx-auto bg-white shadow-xl rounded-2xl overflow-hidden relative">
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-8 text-white text-center">
+                            <h1 className="text-3xl font-bold tracking-wider mb-2">AI 輔助多尺寸 Resize 流程</h1>
+                            <p className="text-slate-300 text-sm tracking-widest uppercase">Standard Operating Procedure</p>
+                            <div className="mt-4 flex justify-center gap-4 text-xs font-mono opacity-80">
+                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-400"></span>AI Automation</span>
+                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400"></span>Human Design</span>
+                            </div>
+                        </div>
+
+                        {/* Disclaimer / 但書 */}
+                        <div className="bg-amber-50 border-b border-amber-100 p-4 flex items-start gap-3 justify-center">
+                            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-1" />
+                            <div className="text-sm text-amber-800 space-y-2">
+                                <div>
+                                <span className="font-bold bg-amber-100 px-1.5 py-0.5 rounded text-amber-700 mr-1">適用範圍</span>
+                                本流程<span className="font-bold underline decoration-amber-500/50 decoration-2 underline-offset-2">僅適用於不複雜的視覺畫面</span>。若主視覺結構過於繁複、具備特殊透視或光影，建議仍採用傳統人工合成工法。
+                                </div>
+                                <div className="pt-2 border-t border-amber-200/60">
+                                <span className="font-bold bg-amber-100 px-1.5 py-0.5 rounded text-amber-700 mr-1">效率評估</span>
+                                數量少時，熟手設計師人工執行可能更快；<span className="font-bold text-amber-900">數量多時建議搭配 JS 腳本</span>一次自動建立所有尺寸畫布，再進行 AI 延伸與版面調整，效益最佳。
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Workflow Body */}
+                        <div className="p-6 md:p-10 relative">
+                            {/* Connecting Line */}
+                            <div className="absolute left-8 md:left-[3.25rem] top-10 bottom-10 w-0.5 bg-slate-200 z-0"></div>
+
+                            <div className="space-y-8 relative z-10">
+                                {steps.map((step, index) => (
+                                <div key={step.id} className="flex gap-4 md:gap-6 group">
+                                    {/* Number/Icon Column */}
+                                    <div className="flex-shrink-0 flex flex-col items-center">
+                                    <div className={`
+                                        w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center shadow-md border-4 border-white transition-transform duration-300 group-hover:scale-110
+                                        ${step.type === 'ai' ? 'bg-gradient-to-br from-purple-500 to-indigo-600 text-white' : 
+                                        step.type === 'human' ? 'bg-gradient-to-br from-orange-400 to-red-500 text-white' : 
+                                        step.type === 'output' ? 'bg-emerald-50 border-emerald-100' :
+                                        'bg-white border-slate-100'}
+                                    `}>
+                                        {step.icon}
+                                    </div>
+                                    </div>
+
+                                    {/* Content Card */}
+                                    <div className={`flex-grow rounded-xl p-5 border transition-all duration-300 hover:shadow-lg
+                                    ${step.highlight ? 'border-l-4 shadow-md' : 'border-slate-200 border-l-2'}
+                                    ${step.type === 'ai' ? 'bg-indigo-50/50 border-indigo-500 border-l-indigo-500' : ''}
+                                    ${step.type === 'human' ? 'bg-orange-50/50 border-orange-400 border-l-orange-400' : ''}
+                                    ${step.type === 'output' ? 'bg-emerald-50/30 border-emerald-500 border-l-emerald-500' : ''}
+                                    `}>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">Step 0{step.id}</span>
+                                        <h3 className="text-lg md:text-xl font-bold text-slate-800">{step.title}</h3>
+                                        </div>
+                                        {step.type === 'ai' && <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded">AI Tools</span>}
+                                        {step.type === 'human' && <span className="px-2 py-1 bg-orange-100 text-orange-700 text-xs font-bold rounded">Designer</span>}
+                                    </div>
+                                    
+                                    <p className="text-sm font-medium text-slate-500 mb-3">{step.subtitle}</p>
+                                    
+                                    <ul className="space-y-2">
+                                        {step.content.map((item, i) => (
+                                        <li key={i} className="flex items-start text-sm text-slate-600 leading-relaxed">
+                                            <span className="mr-2 mt-1.5 w-1.5 h-1.5 bg-slate-400 rounded-full flex-shrink-0"></span>
+                                            {item}
+                                        </li>
+                                        ))}
+                                    </ul>
+                                    </div>
+                                </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Case Study Section */}
+                        <div className="bg-slate-100 p-6 md:p-10 border-t border-slate-200">
+                            <div className="flex items-center gap-2 mb-6 justify-center md:justify-start">
+                                <ImageIcon className="w-5 h-5 text-slate-600" />
+                                <h3 className="text-xl font-bold text-slate-800">實作案例展示 Case Study</h3>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                
+                                {/* Case 1 (HTML Structure - No Lightbox needed) */}
+                                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Structure</div>
+                                    <h4 className="font-bold text-slate-800 mb-3">圖層結構分離</h4>
+                                    <div className="aspect-video bg-slate-800 rounded-lg overflow-hidden relative flex flex-col items-center justify-center border border-slate-700">
+                                        <div className="flex flex-col gap-2 w-3/4">
+                                            <div className="h-8 w-full bg-indigo-500/20 border border-indigo-500/50 rounded flex items-center px-3 text-xs text-indigo-300">
+                                                <Layers className="w-3 h-3 mr-2" /> 文字 & Logo
+                                            </div>
+                                            <div className="h-8 w-full bg-emerald-500/20 border border-emerald-500/50 rounded flex items-center px-3 text-xs text-emerald-300">
+                                                <ImageIcon className="w-3 h-3 mr-2" /> 背景底圖
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-slate-500 mt-3 leading-relaxed">
+                                        Step 1 重點：必須將上方文字與下方水波紋背景徹底分層，確保後續 AI 延伸時不會破壞主體。
+                                    </p>
+                                </div>
+
+                                {/* Case 2 - Clickable Lightbox */}
+                                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                                    <div className="text-xs font-bold text-orange-600 uppercase tracking-widest mb-2">Step 2 Implementation</div>
+                                    <h4 className="font-bold text-slate-800 mb-3">多尺寸工作區設定</h4>
+                                    <div className="aspect-video bg-slate-200 rounded-lg overflow-hidden relative group cursor-zoom-in"
+                                         onClick={() => openLightbox(
+                                             "https://www.dropbox.com/scl/fi/utj3g430a5cqr6zu39yri/step2.png?rlkey=hqgjz1ntlewlsxqkjrkf4jslw&st=rfodsprg&raw=1", 
+                                             "Step 2: Illustrator 多尺寸 Artboard 設定實作"
+                                         )}>
+                                        <img 
+                                            src="https://www.dropbox.com/scl/fi/utj3g430a5cqr6zu39yri/step2.png?rlkey=hqgjz1ntlewlsxqkjrkf4jslw&st=rfodsprg&raw=1" 
+                                            alt="Illustrator 實作畫面截圖" 
+                                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                        />
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all flex items-center justify-center">
+                                            <div className="opacity-0 group-hover:opacity-100 bg-white/90 rounded-full p-2 shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all">
+                                                <ZoomIn className="w-5 h-5 text-slate-700" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-slate-500 mt-3 leading-relaxed">
+                                        Illustrator 實作：建立 600×700, 1400×550 等 Artboards，並將分離好的圖層置入準備。
+                                    </p>
+                                </div>
+
+                                {/* Case 3 - Clickable Lightbox */}
+                                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:col-span-2 lg:col-span-1">
+                                    <div className="text-xs font-bold text-purple-600 uppercase tracking-widest mb-2">Step 3 Implementation</div>
+                                    <h4 className="font-bold text-slate-800 mb-3">AI 背景延伸與修整</h4>
+                                    <div className="aspect-video bg-slate-200 rounded-lg overflow-hidden relative group cursor-zoom-in"
+                                         onClick={() => openLightbox(
+                                             "https://www.dropbox.com/scl/fi/n08iiiihm4319t79xvru0/step3.png?rlkey=ms5d1obs62dbpzictg5nfztgc&st=imdjtj4y&raw=1", 
+                                             "Step 3: AI 背景延伸與修整實作"
+                                         )}>
+                                        <img 
+                                            src="https://www.dropbox.com/scl/fi/n08iiiihm4319t79xvru0/step3.png?rlkey=ms5d1obs62dbpzictg5nfztgc&st=imdjtj4y&raw=1" 
+                                            alt="AI Extension Step 3" 
+                                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                        />
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all flex items-center justify-center">
+                                            <div className="opacity-0 group-hover:opacity-100 bg-white/90 rounded-full p-2 shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all">
+                                                <ZoomIn className="w-5 h-5 text-slate-700" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-slate-500 mt-3 leading-relaxed">
+                                        AI 實作：使用工具延伸背景後，修除浮水印與不自然的紋理，填滿所有尺寸的工作區域。
+                                    </p>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="bg-slate-50 border-t border-slate-200 p-4 text-center text-xs text-slate-400">
+                            <p>© 2025 AI 輔助多尺寸 Resize 流程標準規範 • Designed by Karen @ offerme2</p>
+                        </div>
+                    </div>
+
+                    {/* Lightbox Modal Overlay */}
+                    {lightboxOpen && (
+                        <div 
+                            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 animate-fade-in backdrop-blur-sm"
+                            onClick={() => setLightboxOpen(false)}
+                        >
+                            <div className="relative max-w-7xl w-full flex flex-col items-center">
+                                {/* Close Button */}
+                                <button 
+                                    className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors bg-white/10 p-2 rounded-full hover:bg-white/20"
+                                    onClick={() => setLightboxOpen(false)}
+                                >
+                                    <XIcon className="w-6 h-6" />
+                                </button>
+                                
+                                {/* Image */}
+                                <img 
+                                    src={lightboxImage.src} 
+                                    alt={lightboxImage.title}
+                                    className="max-h-[85vh] w-auto object-contain rounded-lg shadow-2xl bg-slate-900"
+                                    onClick={(e) => e.stopPropagation()} // Prevent closing when clicking image itself
+                                />
+                                
+                                {/* Caption */}
+                                <p className="mt-4 text-white/90 text-lg font-medium tracking-wide text-center">
+                                    {lightboxImage.title}
+                                </p>
+                                <p className="text-white/50 text-xs mt-2 text-center">點擊背景任一處關閉</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<Flowchart />);
+    </script>
+</body>
+</html>
